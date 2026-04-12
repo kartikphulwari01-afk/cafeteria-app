@@ -1,26 +1,93 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@plugin "tailwindcss-animate";
 
-@theme inline {
+@custom-variant dark (&:is(.dark *));
+
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /* Primary Neon Orange */
+  --color-primary: #FF5A00;
+  --color-primary-foreground: #FFFFFF;
+  --color-primary-hover: #E04E00;
+
+  /* Black/Grey Base */
+  --color-card: #151515;
+  --color-card-foreground: #EDEDED;
+  --color-popover: #151515;
+  --color-popover-foreground: #EDEDED;
+  
+  --color-muted: #262626;
+  --color-muted-foreground: #A1A1AA;
+  
+  --color-accent: #262626;
+  --color-accent-foreground: #EDEDED;
+  
+  --color-border: #262626;
+  --color-input: #262626;
+  --color-ring: #FF5A00;
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  /* Force Premium Dark Theme */
+  --background: #0f0f14;
+  --foreground: #FAFAFA;
+  --radius: 1rem;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+  /* Smooth scrolling for anchor links */
+  scroll-behavior: smooth;
 }
+
+/* Glassmorphism utility classes */
+.glass {
+  background: rgba(21, 21, 21, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel {
+  background: rgba(38, 38, 38, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Hide scrollbar for clean UI but keep functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* NESCAFE BRANDING & HERO GRADIENT */
+.nescafe-hero-bg {
+  background: radial-gradient(circle at 50% 50%, #4a1f00 0%, #170a00 50%, #0f0f14 100%);
+  position: relative;
+  overflow: hidden;
+  animation: breathe 8s ease-in-out infinite alternate;
+}
+
+@keyframes breathe {
+  0% { transform: scale(1); filter: brightness(1); }
+  100% { transform: scale(1.05); filter: brightness(1.2); }
+}
+
+.nescafe-accent {
+  color: #c9510c; /* Nescafe classic red/orange tint */
+}
+
