@@ -1,18 +1,19 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
-// Firebase config
+// Firebase config — values loaded from environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyDvyGOXAaYgtBfF9Z_XThRJNf7u__-bgUM",
-  authDomain: "cafeteria-app-81c8d.firebaseapp.com",
-  projectId: "cafeteria-app-81c8d",
-  storageBucket: "cafeteria-app-81c8d.firebasestorage.app",
-  messagingSenderId: "948167601474",
-  appId: "1:948167601474:web:74878cf6d5865b69d7ecdb",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// 🔥 THIS IS IMPORTANT (auth export)
 export const auth = getAuth(app);
+export const db = getFirestore(app);

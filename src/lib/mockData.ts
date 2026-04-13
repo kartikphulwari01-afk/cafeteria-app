@@ -11,7 +11,7 @@ export interface MenuItem {
   tags?: string[];
 }
 
-export type OrderStatus = 'placed' | 'preparing' | 'ready';
+export type OrderStatus = 'placed' | 'preparing' | 'ready' | 'completed';
 export type PaymentMethod = 'COD' | 'QR' | 'UPI' | 'CARD';
 export type PaymentStatus = 'Pending' | 'Paid';
 

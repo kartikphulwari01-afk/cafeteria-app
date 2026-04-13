@@ -25,10 +25,30 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-full">
       {/* Premium Animated Hero Section */}
-      <section className="relative px-4 pt-24 pb-36 overflow-hidden flex flex-col items-center justify-center text-center !bg-transparent">
+      <section className="relative px-4 pt-32 pb-40 overflow-hidden flex flex-col items-center justify-center text-center !bg-transparent">
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes float-slow {
+            0%, 100% { transform: translate(0px, 0px) rotate(0deg) scale(1); }
+            33% { transform: translate(20px, -30px) rotate(3deg) scale(1.05); }
+            66% { transform: translate(-10px, 20px) rotate(-2deg) scale(0.95); }
+          }
+          .animate-float-slow {
+            animation: float-slow 15s ease-in-out infinite;
+          }
+        `}} />
+        
         {/* Animated CSS Coffee Gradient Background */}
-        <div className="absolute inset-0 z-[-2] bg-[#0f0f14]">
-          <div className="absolute inset-0 z-[-1] nescafe-hero-bg opacity-40"></div>
+        <div className="absolute inset-0 z-[-2] bg-gradient-to-b from-[#050505] to-[#0a0f1a] overflow-hidden">
+          {/* Layer 2: Glow & Float Filters */}
+          <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-orange-600 rounded-full blur-[150px] opacity-[0.14] animate-float-slow mix-blend-screen pointer-events-none"></div>
+          <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-red-600 rounded-full blur-[180px] opacity-[0.10] animate-float-slow pointer-events-none" style={{ animationDelay: '-5s', animationDuration: '12s' }}></div>
+          <div className="absolute top-[30%] left-[40%] w-[800px] h-[800px] bg-primary rounded-full blur-[200px] opacity-[0.08] animate-float-slow pointer-events-none" style={{ animationDelay: '-10s', animationDuration: '18s' }}></div>
+
+          {/* Layer 3: Ultra Subtle Food Elements */}
+          <div className="absolute top-[10%] left-[5%] text-[24rem] blur-xl opacity-[0.06] grayscale mix-blend-overlay pointer-events-none animate-float-slow select-none leading-none">🍔</div>
+          <div className="absolute top-[30%] right-[-5%] text-[28rem] blur-xl opacity-[0.05] grayscale mix-blend-soft-light pointer-events-none animate-float-slow select-none leading-none" style={{ animationDelay: '-8s', animationDuration: '14s' }}>☕</div>
+          <div className="absolute bottom-[-15%] left-[25%] text-[30rem] blur-xl opacity-[0.06] grayscale mix-blend-overlay pointer-events-none animate-float-slow select-none leading-none" style={{ animationDelay: '-3s', animationDuration: '20s' }}>🍟</div>
+
           {/* Grain overlay for premium texture */}
           <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/stardust.png")' }}></div>
         </div>

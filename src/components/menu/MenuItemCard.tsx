@@ -5,7 +5,9 @@ import { motion } from 'framer-motion';
 import { MenuItem } from '@/lib/mockData';
 import { useCartStore } from '@/store/cartStore';
 import { useSystemStore } from '@/store/systemStore';
-import { Plus, Check, Info } from 'lucide-react';
+import { Plus, Heart } from 'lucide-react';
+import { useFavoriteStore } from '@/store/favoriteStore';
+import { useToastStore } from '@/store/toastStore';
 
 interface MenuItemCardProps {
   item: MenuItem;
@@ -18,6 +20,20 @@ export const MenuItemCard = ({ item, index }: MenuItemCardProps) => {
 
   const cartItem = items.find(i => i.id === item.id);
   const cartQuantity = cartItem?.quantity || 0;
+  
+  const { favoriteIds, toggleFavorite } = useFavoriteStore();
+  const { addToast } = useToastStore();
+  const isFav = favoriteIds.includes(item.id);
+
+  const handleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleFavorite(item.id);
+    if (!isFav) {
+      addToast(`${item.name} added to favorites ❤️`, 'success');
+    } else {
+      addToast(`${item.name} removed from favorites`, 'default');
+    }
+  };
 
   const handleAdd = () => {
     if (!item.isAvailable || !isOpen) return;
@@ -31,6 +47,7 @@ export const MenuItemCard = ({ item, index }: MenuItemCardProps) => {
         quantity: 1,
         imageUrl: item.imageUrl
       });
+      addToast(`${item.name} added to cart 🛒`, 'success');
     }
   };
   
@@ -53,6 +70,12 @@ export const MenuItemCard = ({ item, index }: MenuItemCardProps) => {
       <div className="relative h-44 w-full overflow-hidden bg-[#15151a]">
         {/* Placeholder styling instead of real images to ensure it looks good even with placeholders */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f14] via-transparent to-transparent z-10"></div>
+        <button 
+          onClick={handleFavorite}
+          className="absolute top-3 right-3 z-30 p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white transition-all hover:scale-110 active:scale-95"
+        >
+          <Heart className={`w-5 h-5 transition-colors ${isFav ? 'fill-red-500 text-red-500' : 'text-white/80 hover:text-white'}`} />
+        </button>
         <img 
           src={item.imageUrl || 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&q=80&w=600'} 
           onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&q=80&w=600'; }}
@@ -69,7 +92,7 @@ export const MenuItemCard = ({ item, index }: MenuItemCardProps) => {
         )}
         
         {/* Tags */}
-        <div className="absolute top-3 right-3 z-20 flex flex-col gap-2 items-end">
+        <div className="absolute top-14 right-3 z-20 flex flex-col gap-2 items-end">
           {item.tags?.map(tag => (
             <span key={tag} className={`px-2.5 py-0.5 text-xs font-bold rounded-md shadow-lg ${tag === 'Bestseller' ? 'bg-primary text-white' : tag === 'Hot' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}`}>
               {tag}

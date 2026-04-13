@@ -4,7 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/cartStore';
 import { useUserStore } from '@/store/userStore';
-import { api } from '@/lib/api';
+import { useToastStore } from '@/store/toastStore';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Clock, Navigation, CheckCircle, ArrowLeft, QrCode, Smartphone, Copy, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,10 +15,16 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, totalPrice, clearCart } = useCartStore();
   const { user } = useUserStore();
+  const { addToast } = useToastStore();
   
-  const [pickupTime, setPickupTime] = useState('12:00 PM');
+  const [pickupType, setPickupType] = useState<'ASAP' | 'SCHEDULED'>('ASAP');
+  const [scheduledTime, setScheduledTime] = useState('');
+  const [timeError, setTimeError] = useState('');
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [successOrderId, setSuccessOrderId] = useState('');
+  const [successOrderTotal, setSuccessOrderTotal] = useState(0);
 
   const [paymentMethod, setPaymentMethod] = useState<'QR' | 'UPI'>('QR');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -36,31 +44,63 @@ export default function CheckoutPage() {
     );
   }
 
+  const validateTime = (timeValue: string) => {
+    setScheduledTime(timeValue);
+    if (!timeValue) {
+      setTimeError('Please select a time');
+      return false;
+    }
+
+    const now = new Date();
+    const [hours, minutes] = timeValue.split(':').map(Number);
+    const selectedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
+    
+    const minDelayMs = 10 * 60 * 1000; // 10 minutes
+    if (selectedDate.getTime() < now.getTime() + minDelayMs) {
+      setTimeError('Pickup must be at least 10 minutes from now');
+      return false;
+    }
+    
+    setTimeError('');
+    return true;
+  };
+
   const handlePlaceOrder = async () => {
+    if (pickupType === 'SCHEDULED' && !validateTime(scheduledTime)) {
+      return;
+    }
+
     setIsProcessing(true);
     
     try {
+      if (!user?.uid) {
+        throw new Error("User not found setup or logged in.");
+      }
+
       const orderData = {
         userId: user.uid,
         items: items.map(i => ({ menuItemId: i.id, name: i.name, price: i.price, quantity: i.quantity })),
         totalAmount: totalPrice(),
-        pickupTime,
+        pickupType,
+        scheduledTime: pickupType === 'SCHEDULED' ? scheduledTime : null,
+        pickupTime: pickupType === 'ASAP' ? 'ASAP' : `Scheduled: ${scheduledTime}`,
         paymentMethod: paymentMethod, // Will be "QR" or "UPI"
-        paymentStatus: 'Pending Verification'
+        paymentStatus: 'Pending Verification',
+        status: 'pending',
+        createdAt: serverTimestamp(),
       };
+      const finalTotal = totalPrice();
+      const docRef = await addDoc(collection(db, "orders"), orderData);
       
-      const newOrder = await api.placeOrder(orderData);
+      setSuccessOrderId(docRef.id);
+      setSuccessOrderTotal(finalTotal);
       
       setShowConfirmModal(false);
       setIsSuccess(true);
       clearCart();
       
-      setTimeout(() => {
-        router.push(`/orders/${newOrder.id}`);
-      }, 2500);
-      
-    } catch (e) {
-      alert("Checkout failed. Please try again.");
+    } catch {
+      addToast('Checkout failed. Please try again.', 'warn');
       setIsProcessing(false);
       setShowConfirmModal(false);
     }
@@ -72,22 +112,45 @@ export default function CheckoutPage() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0f0f14]">
+      <div className="min-h-screen flex items-center justify-center bg-[#0f0f14] relative overflow-hidden">
+        <div className="absolute inset-0 bg-primary/5 blur-[200px] pointer-events-none"></div>
+        
         <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-[#15151a] p-10 rounded-3xl border border-white/10 text-center shadow-2xl max-w-sm w-full"
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="bg-[#15151a]/80 backdrop-blur-xl p-8 sm:p-10 rounded-3xl border border-white/10 text-center shadow-2xl max-w-md w-full relative z-10"
         >
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+            transition={{ duration: 0.4, ease: 'easeOut', delay: 0.2 }}
           >
-            <CheckCircle className="w-24 h-24 text-primary mb-6 mx-auto drop-shadow-[0_0_15px_rgba(255,90,0,0.5)]" />
+            <div className="w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+              <CheckCircle className="w-12 h-12 text-green-500" />
+            </div>
           </motion.div>
-          <h2 className="text-3xl font-black text-white mb-2">Order Placed!</h2>
-          <p className="text-muted-foreground mb-6">Waiting for payment verification and restaurant confirmation...</p>
-          <div className="w-8 h-8 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          
+          <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Order Placed Successfully 🎉</h2>
+          <p className="text-muted-foreground mb-8 text-lg font-medium">Your food is being prepared</p>
+          
+          <div className="bg-black/40 rounded-2xl p-6 mb-8 border border-white/5 space-y-3 relative overflow-hidden text-left">
+             <div className="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/5">
+                <span className="text-white/60 text-sm font-semibold uppercase tracking-wider">Order ID</span>
+                <span className="text-white font-mono font-bold tracking-widest">{successOrderId.slice(-6).toUpperCase()}</span>
+             </div>
+             <div className="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/5">
+                <span className="text-white/60 text-sm font-semibold uppercase tracking-wider">Total Amount</span>
+                <span className="text-primary font-black text-lg">₹{successOrderTotal.toFixed(2)}</span>
+             </div>
+          </div>
+          
+          <Button 
+             onClick={() => router.push(`/orders/${successOrderId}`)}
+             className="w-full h-14 text-lg font-black bg-white text-black hover:bg-white/90 shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+          >
+             Track Order
+          </Button>
         </motion.div>
       </div>
     );
@@ -108,21 +171,56 @@ export default function CheckoutPage() {
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-white">
               <Clock className="w-5 h-5 text-primary" /> Pickup Time
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {['ASAP (~15m)', '12:00 PM', '12:30 PM', '1:00 PM'].map(time => (
-                <div 
-                  key={time}
-                  onClick={() => setPickupTime(time)}
-                  className={`p-4 rounded-xl border cursor-pointer font-bold transition-all ${
-                    pickupTime === time 
-                      ? 'bg-primary/20 border-primary text-primary shadow-[0_0_15px_rgba(255,90,0,0.2)]' 
-                      : 'bg-white/5 border-white/10 text-muted-foreground hover:border-white/30'
-                  }`}
-                >
-                  {time}
-                </div>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <div 
+                onClick={() => setPickupType('ASAP')}
+                className={`p-4 rounded-xl border cursor-pointer font-bold transition-all ${
+                  pickupType === 'ASAP' 
+                    ? 'bg-primary/20 border-primary text-primary shadow-[0_0_15px_rgba(255,90,0,0.2)]' 
+                    : 'bg-white/5 border-white/10 text-muted-foreground hover:border-white/30'
+                }`}
+              >
+                ASAP (~15 min)
+              </div>
+              <div 
+                onClick={() => {
+                  setPickupType('SCHEDULED');
+                  if (!scheduledTime) {
+                    const defaultTime = new Date(Date.now() + 15 * 60000);
+                    setScheduledTime(`${defaultTime.getHours().toString().padStart(2, '0')}:${defaultTime.getMinutes().toString().padStart(2, '0')}`);
+                  }
+                }}
+                className={`p-4 rounded-xl border cursor-pointer font-bold transition-all ${
+                  pickupType === 'SCHEDULED' 
+                    ? 'bg-primary/20 border-primary text-primary shadow-[0_0_15px_rgba(255,90,0,0.2)]' 
+                    : 'bg-white/5 border-white/10 text-muted-foreground hover:border-white/30'
+                }`}
+              >
+                Schedule Order
+              </div>
             </div>
+
+            <AnimatePresence>
+              {pickupType === 'SCHEDULED' && (
+                <motion.div 
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="pt-2">
+                    <label className="block text-sm font-bold text-white/70 mb-2">Select Time (24h)</label>
+                    <input 
+                      type="time" 
+                      value={scheduledTime}
+                      onChange={(e) => validateTime(e.target.value)}
+                      className={`w-full bg-black/40 border rounded-xl p-3 text-white font-mono text-lg focus:outline-none transition-colors ${timeError ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-primary/50'}`}
+                    />
+                    {timeError && <p className="text-red-400 text-sm mt-2 font-medium">{timeError}</p>}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="bg-[#15151a] border border-white/10 rounded-3xl p-6">

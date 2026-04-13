@@ -4,8 +4,12 @@ import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { motion } from 'framer-motion';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useUserStore } from '@/store/userStore';
 
 export default function SupportPage() {
+  const { user } = useUserStore();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -26,27 +30,20 @@ export default function SupportPage() {
     setStatus('loading');
 
     try {
-      const emailjs = (await import('@emailjs/browser')).default;
-      // Configuration Note from Dev: These keys are for EmailJS. 
-      // Ensure you replace "YOUR_SERVICE_ID", "YOUR_TEMPLATE_ID", and "YOUR_PUBLIC_KEY" 
-      // with valid ones from your EmailJS dashboard for actual production routing.
-      await emailjs.send(
-        process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID || 'service_default',
-        process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID || 'template_default',
-        {
-          from_name: formData.name,
-          from_email: formData.email,
-          message: formData.message,
-          to_email: 'kartikphulwari01@gmail.com'
-        },
-        process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY || 'public_key_default'
-      );
+      await addDoc(collection(db, "contactMessages"), {
+        name: formData.name,
+        email: formData.email,
+        message: formData.message,
+        userId: user?.uid || null,
+        isRead: false,
+        createdAt: serverTimestamp()
+      });
       
       setStatus('success');
       setFormData({ name: '', email: '', message: '' });
       setTimeout(() => setStatus('idle'), 5000);
     } catch (error) {
-      console.error('Email sending failed:', error);
+      console.error('Submission failed:', error);
       setStatus('error');
       setTimeout(() => setStatus('idle'), 5000);
     }
@@ -102,8 +99,7 @@ export default function SupportPage() {
               <div>
                 <p className="text-sm font-semibold text-white/50 mb-1">Visit Us</p>
                 <p className="text-white font-medium max-w-xs leading-relaxed">
-                  University Campus Cafeteria<br />
-                  Main Food Court Block
+                  University Cafeteria
                 </p>
               </div>
             </div>
@@ -180,10 +176,10 @@ export default function SupportPage() {
               </div>
               
               {status === 'success' && (
-                <p className="text-center text-green-400 text-sm font-medium mt-4">Your message was sent successfully. We'll get back to you soon.</p>
+                <p className="text-center text-green-400 text-sm font-medium mt-4">Message sent successfully 🚀</p>
               )}
               {status === 'error' && (
-                <p className="text-center text-red-400 text-sm font-medium mt-4">There was a problem sending your message. Please verify your EmailJS details.</p>
+                <p className="text-center text-red-400 text-sm font-medium mt-4">Something went wrong, try again</p>
               )}
             </div>
           </form>

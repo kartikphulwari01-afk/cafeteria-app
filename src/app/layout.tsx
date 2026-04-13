@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
+import { CartBar } from "@/components/ui/CartBar";
+import { ToastContainer } from "@/components/ui/ToastContainer";
+import { OrderNotifier } from "@/components/ui/OrderNotifier";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,10 +25,13 @@ export default function RootLayout({
         className={`${inter.className} min-h-screen bg-background text-foreground antialiased selection:bg-primary selection:text-white pb-20 sm:pb-0 font-sans`}
       >
         <div className="fixed inset-0 z-[-1] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-900 via-background to-background"></div>
+        <ToastContainer />
+        <OrderNotifier />
         <Navbar />
         <main className="pt-16 min-h-[calc(100vh-64px)]">
           {children}
         </main>
+        <CartBar />
       </body>
     </html>
   );

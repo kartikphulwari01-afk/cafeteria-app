@@ -114,8 +114,21 @@ export default function MenuPage() {
       <div className="px-4 sm:px-8 max-w-7xl mx-auto mt-8">
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="h-44 rounded-3xl bg-white/5 animate-pulse border border-white/5"></div>
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="flex gap-4 p-4 rounded-3xl bg-[#15151a] border border-white/5 skeleton h-[180px]">
+                 <div className="w-1/3 rounded-2xl bg-white/5"></div>
+                 <div className="flex-1 flex flex-col justify-between py-1">
+                    <div className="space-y-3">
+                      <div className="h-5 bg-white/10 rounded w-3/4"></div>
+                      <div className="h-3 bg-white/5 rounded w-full"></div>
+                      <div className="h-3 bg-white/5 rounded w-5/6"></div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                       <div className="h-6 bg-white/10 rounded w-16"></div>
+                       <div className="h-8 w-8 bg-white/10 rounded-full"></div>
+                    </div>
+                 </div>
+              </div>
             ))}
           </div>
         ) : isSearching ? (
@@ -154,30 +167,7 @@ export default function MenuPage() {
         )}
       </div>
 
-      {/* Floating Action Button for Cart */}
-      <AnimatePresence>
-        {totalItems() > 0 && (
-          <motion.div 
-            initial={{ y: 150, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 150, opacity: 0 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] sm:w-96 z-40"
-          >
-            <button 
-              onClick={() => setDrawerOpen(true)}
-              className="w-full bg-gradient-to-r from-primary to-orange-500 rounded-2xl p-4 flex items-center justify-between shadow-[0_10px_40px_rgba(255,90,0,0.5)] border border-white/20 group hover:brightness-110 transition-all duration-300"
-            >
-              <div className="flex flex-col text-left text-white">
-                <span className="text-sm font-bold uppercase tracking-wider">{totalItems()} item{totalItems() !== 1 ? 's' : ''} added</span>
-                <span className="text-xl font-black">₹{totalPrice().toFixed(2)}</span>
-              </div>
-              <div className="flex items-center gap-2 font-bold text-white bg-white/20 px-4 py-2 rounded-xl backdrop-blur-md group-hover:bg-white/30 transition">
-                View Cart <ShoppingBag className="w-5 h-5 ml-1" />
-              </div>
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
 
     </div>
   );

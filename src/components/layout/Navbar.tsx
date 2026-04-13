@@ -8,6 +8,7 @@ import { useSystemStore } from '@/store/systemStore';
 import { useUserStore } from '@/store/userStore';
 import { CartDrawer } from '@/components/ui/CartDrawer';
 import { Button } from '@/components/ui/Button';
+import { LiveClock } from '@/components/ui/LiveClock';
 
 export const Navbar = () => {
   const { totalItems, isDrawerOpen, setDrawerOpen } = useCartStore();
@@ -42,20 +43,26 @@ export const Navbar = () => {
               {user?.role === 'admin' ? (
                 <Link href="/admin" className="text-sm font-medium text-primary hover:text-primary-hover transition">Admin Dashboard</Link>
               ) : user ? (
-                <Link href="/orders" className="text-sm font-medium text-muted-foreground hover:text-white transition">My Orders</Link>
+                <>
+                  <Link href="/orders" className="text-sm font-medium text-muted-foreground hover:text-white transition">My Orders</Link>
+                  <Link href="/favorites" className="text-sm font-medium text-muted-foreground hover:text-white transition">Favorites</Link>
+                </>
               ) : null}
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2">
-              <span className="relative flex h-3 w-3">
-                {isOpen && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
-                <span className={`relative inline-flex rounded-full h-3 w-3 ${isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
-              </span>
-              <span className="text-sm font-medium text-muted-foreground mr-2">
-                {isOpen ? 'Open Now' : 'Closed'}
-              </span>
+            <div className="hidden sm:flex items-center gap-3 mr-2">
+              <LiveClock />
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  {isOpen && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
+                  <span className={`relative inline-flex rounded-full h-3 w-3 ${isOpen ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                </span>
+                <span className="text-sm font-medium text-muted-foreground">
+                  {isOpen ? 'Open Now' : 'Closed'}
+                </span>
+              </div>
             </div>
 
             {user ? (

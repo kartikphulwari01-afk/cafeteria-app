@@ -21,6 +21,7 @@ export const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
             onClick={onClose}
             className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           />
@@ -28,7 +29,7 @@ export const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
             className="fixed right-0 top-0 z-50 h-full w-full max-w-sm glass-panel border-l border-white/10 shadow-2xl flex flex-col bg-[#0f0f14]"
           >
             <div className="flex items-center justify-between p-6 border-b border-white/10">
@@ -44,34 +45,57 @@ export const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
             <div className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col">
               {items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-60">
-                  <ShoppingBag className="w-16 h-16 mb-4" />
-                  <p>Your cart is empty.</p>
+                  <ShoppingBag className="w-16 h-16 mb-4 text-white/20" />
+                  <p className="text-lg font-bold text-white mb-2">Your cart is empty 🛒</p>
+                  <p className="text-sm">Explore the menu to add items.</p>
                 </div>
               ) : (
-                items.map((item) => (
-                  <div key={item.id} className="flex gap-4">
-                    <img src={item.imageUrl} alt={item.name} className="w-20 h-20 rounded-lg object-cover bg-muted" />
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm mb-1 text-white">{item.name}</h4>
-                      <div className="text-primary font-bold text-sm mb-2">₹{item.price.toFixed(2)}</div>
-                      <div className="flex items-center gap-3">
-                        <button 
-                          onClick={() => item.quantity > 1 ? updateQuantity(item.id, item.quantity - 1) : removeItem(item.id)}
-                          className="w-6 h-6 rounded bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="text-sm font-medium w-4 text-center text-white">{item.quantity}</span>
-                        <button 
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="w-6 h-6 rounded bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
+                <AnimatePresence mode="popLayout">
+                  {items.map((item) => (
+                    <motion.div 
+                      key={item.id} 
+                      layout
+                      initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, x: -20 }}
+                      transition={{ duration: 0.2, ease: 'easeOut' }}
+                      className="flex gap-4 bg-white/5 p-3 rounded-2xl border border-white/5"
+                    >
+                      <img src={item.imageUrl} alt={item.name} loading="lazy" className="w-20 h-20 rounded-xl object-cover bg-muted" />
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm mb-1 text-white">{item.name}</h4>
+                        <div className="text-primary font-bold text-sm mb-2">₹{item.price.toFixed(2)}</div>
+                        <div className="flex items-center gap-3">
+                          <motion.button 
+                            whileTap={{ scale: 0.8 }}
+                            transition={{ duration: 0.15, ease: 'easeOut' }}
+                            onClick={() => item.quantity > 1 ? updateQuantity(item.id, item.quantity - 1) : removeItem(item.id)}
+                            className="w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </motion.button>
+                          <motion.span 
+                            key={item.quantity}
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ duration: 0.15, ease: 'easeOut' }}
+                            className="text-sm font-bold w-4 text-center text-white"
+                          >
+                            {item.quantity}
+                          </motion.span>
+                          <motion.button 
+                            whileTap={{ scale: 0.8 }}
+                            transition={{ duration: 0.15, ease: 'easeOut' }}
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            className="w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </motion.button>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               )}
             </div>
 
@@ -79,7 +103,9 @@ export const CartDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               <div className="p-6 border-t border-white/10 bg-black/40 space-y-4">
                 <div className="flex justify-between items-center py-2">
                   <span className="text-muted-foreground font-medium">Subtotal</span>
-                  <span className="text-2xl font-bold text-white">₹{totalPrice().toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-white">
+                    ₹{totalPrice().toFixed(2)}
+                  </span>
                 </div>
                 
                 <Button 
