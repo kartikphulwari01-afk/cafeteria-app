@@ -67,7 +67,7 @@ export const MenuItemCard = ({ item, index }: MenuItemCardProps) => {
       transition={{ delay: (index % 10) * 0.05, duration: 0.4 }}
       className={`relative group rounded-3xl overflow-hidden glass-panel border border-white/5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_15px_40px_rgb(255,90,0,0.2)] flex flex-col ${!item.isAvailable ? 'opacity-60 grayscale-[50%]' : ''}`}
     >
-      <div className="relative h-44 w-full overflow-hidden bg-[#15151a]">
+      <div className="relative aspect-square w-full overflow-hidden bg-[#15151a]">
         {/* Placeholder styling instead of real images to ensure it looks good even with placeholders */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f14] via-transparent to-transparent z-10"></div>
         <button 
