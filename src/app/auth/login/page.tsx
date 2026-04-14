@@ -141,6 +141,8 @@ export default function LoginPage() {
       const { GoogleAuthProvider, signInWithPopup, signOut } = await import('firebase/auth');
 
       const googleProvider = new GoogleAuthProvider();
+      // Force account selection to prevent silent failures with stale sessions
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
 
       const result = await signInWithPopup(auth, googleProvider);
 

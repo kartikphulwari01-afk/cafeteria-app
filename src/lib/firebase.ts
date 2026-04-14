@@ -29,9 +29,23 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// Explicitly set persistence to local to ensure session survivors across reloads/proxies
+// Diagnostic Mode: Log masked config on client to verify build variables
 if (typeof window !== "undefined") {
-  setPersistence(auth, browserLocalPersistence).catch(console.error);
+  const maskedKey = firebaseConfig.apiKey 
+    ? `${firebaseConfig.apiKey.substring(0, 6)}...${firebaseConfig.apiKey.substring(firebaseConfig.apiKey.length - 4)}`
+    : 'MISSING';
+    
+  console.log("🔥 Firebase Config Diagnostic:", {
+    apiKey: maskedKey,
+    projectId: firebaseConfig.projectId,
+    authDomain: firebaseConfig.authDomain,
+    isInitialized: !!app
+  });
+
+  // Ensure persistence is set
+  setPersistence(auth, browserLocalPersistence).catch(err => {
+    console.error("Firebase Persistence Error:", err);
+  });
 }
 
 export default app;
