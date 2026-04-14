@@ -26,16 +26,6 @@ export default function Home() {
     <div className="flex flex-col min-h-full">
       {/* Premium Animated Hero Section */}
       <section className="relative px-4 pt-32 pb-40 overflow-hidden flex flex-col items-center justify-center text-center !bg-transparent">
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes float-slow {
-            0%, 100% { transform: translate(0px, 0px) rotate(0deg) scale(1); }
-            33% { transform: translate(20px, -30px) rotate(3deg) scale(1.05); }
-            66% { transform: translate(-10px, 20px) rotate(-2deg) scale(0.95); }
-          }
-          .animate-float-slow {
-            animation: float-slow 15s ease-in-out infinite;
-          }
-        `}} />
         
         {/* Animated CSS Coffee Gradient Background */}
         <div className="absolute inset-0 z-[-2] bg-gradient-to-b from-[#050505] to-[#0a0f1a] overflow-hidden">

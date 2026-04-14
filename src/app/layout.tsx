@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import Script from "next/script";
 import { Navbar } from "@/components/layout/Navbar";
 import { CartBar } from "@/components/ui/CartBar";
 import { ToastContainer } from "@/components/ui/ToastContainer";
@@ -32,6 +33,11 @@ export default function RootLayout({
           {children}
         </main>
         <CartBar />
+        <Script
+          id="razorpay-checkout"
+          src="https://checkout.razorpay.com/v1/checkout.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

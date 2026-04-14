@@ -7,9 +7,54 @@ import { useUserStore } from '@/store/userStore';
 import { useToastStore } from '@/store/toastStore';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Clock, Navigation, CheckCircle, ArrowLeft, QrCode, Smartphone, Copy, ExternalLink } from 'lucide-react';
+import { Clock, Navigation, CheckCircle, ArrowLeft, QrCode, Smartphone, Copy, ExternalLink, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
+import confetti from 'canvas-confetti';
+
+// Tell TypeScript about the globally-loaded Razorpay SDK (injected via next/script in layout.tsx)
+declare global {
+  interface Window {
+    Razorpay: new (options: Record<string, any>) => { open: () => void };
+  }
+}
+
+// Premium celebration effect — warm palette matching app branding, non-blocking
+function triggerCelebration() {
+  const colors = ['#FF5A00', '#FF8C42', '#FFD700', '#FFFFFF', '#FF3D00'];
+
+  // Centre burst
+  confetti({
+    particleCount: 80,
+    spread: 70,
+    origin: { y: 0.6 },
+    colors,
+    shapes: ['star', 'circle'],
+    scalar: 1.1,
+  });
+
+  // Subtle side bursts at 300 ms — max total duration ~1.2 s
+  setTimeout(() => {
+    confetti({
+      particleCount: 40,
+      angle: 60,
+      spread: 55,
+      origin: { x: 0, y: 0.7 },
+      colors,
+      shapes: ['star'],
+      scalar: 0.9,
+    });
+    confetti({
+      particleCount: 40,
+      angle: 120,
+      spread: 55,
+      origin: { x: 1, y: 0.7 },
+      colors,
+      shapes: ['star'],
+      scalar: 0.9,
+    });
+  }, 300);
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -26,7 +71,7 @@ export default function CheckoutPage() {
   const [successOrderId, setSuccessOrderId] = useState('');
   const [successOrderTotal, setSuccessOrderTotal] = useState(0);
 
-  const [paymentMethod, setPaymentMethod] = useState<'QR' | 'UPI'>('QR');
+  const [paymentMethod, setPaymentMethod] = useState<'QR' | 'UPI' | 'RAZORPAY'>('QR');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   useEffect(() => {
@@ -65,7 +110,11 @@ export default function CheckoutPage() {
     return true;
   };
 
-  const handlePlaceOrder = async () => {
+  // Core order placement — accepts optional Razorpay payment details
+  const handlePlaceOrder = async (razorpayData?: {
+    paymentId: string;
+    orderId: string;
+  }) => {
     if (pickupType === 'SCHEDULED' && !validateTime(scheduledTime)) {
       return;
     }
@@ -74,23 +123,33 @@ export default function CheckoutPage() {
     
     try {
       if (!user?.uid) {
-        throw new Error("User not found setup or logged in.");
+        throw new Error('User not found or not logged in.');
       }
+
+      const isRazorpayPayment = !!razorpayData;
 
       const orderData = {
         userId: user.uid,
+        userName: user.name || user.email,
+        userEmail: user.email,
         items: items.map(i => ({ menuItemId: i.id, name: i.name, price: i.price, quantity: i.quantity })),
         totalAmount: totalPrice(),
         pickupType,
         scheduledTime: pickupType === 'SCHEDULED' ? scheduledTime : null,
         pickupTime: pickupType === 'ASAP' ? 'ASAP' : `Scheduled: ${scheduledTime}`,
-        paymentMethod: paymentMethod, // Will be "QR" or "UPI"
-        paymentStatus: 'Pending Verification',
+        paymentMethod: isRazorpayPayment ? 'RAZORPAY' : paymentMethod,
+        paymentStatus: isRazorpayPayment ? 'Paid' : 'Pending Verification',
+        // Store Razorpay IDs for reconciliation if paid online
+        ...(razorpayData && {
+          razorpayPaymentId: razorpayData.paymentId,
+          razorpayOrderId: razorpayData.orderId,
+        }),
         status: 'pending',
         createdAt: serverTimestamp(),
       };
+
       const finalTotal = totalPrice();
-      const docRef = await addDoc(collection(db, "orders"), orderData);
+      const docRef = await addDoc(collection(db, 'orders'), orderData);
       
       setSuccessOrderId(docRef.id);
       setSuccessOrderTotal(finalTotal);
@@ -106,8 +165,124 @@ export default function CheckoutPage() {
     }
   };
 
+  // Razorpay payment flow — calls backend to create order, then opens popup
+  const handlePayment = async () => {
+    if (pickupType === 'SCHEDULED' && !validateTime(scheduledTime)) {
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      // Step 1: Create Razorpay order on the backend (secret key stays server-side)
+      const res = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: totalPrice() }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        addToast(err.error || 'Payment initiation failed. Please try again.', 'warn');
+        setIsProcessing(false);
+        return;
+      }
+
+      const order = await res.json();
+
+      // Step 2: Open Razorpay checkout popup
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: order.amount,        // in paisa from backend
+        currency: order.currency,
+        name: 'CafeBuddy',
+        description: 'Cafeteria Order Payment',
+        order_id: order.id,
+        // Step 3: Verify payment then place order
+        handler: async (response: {
+          razorpay_payment_id: string;
+          razorpay_order_id: string;
+          razorpay_signature: string;
+        }) => {
+          setIsProcessing(true);
+          try {
+            // 1. Construct order data to be saved on the backend
+            const orderPayload = {
+              userId: user.uid,
+              userName: user.name || user.email,
+              userEmail: user.email,
+              items: items.map(i => ({ menuItemId: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+              totalAmount: totalPrice(),
+              pickupType,
+              scheduledTime: pickupType === 'SCHEDULED' ? scheduledTime : null,
+              pickupTime: pickupType === 'ASAP' ? 'ASAP' : `Scheduled: ${scheduledTime}`,
+              status: 'pending',
+            };
+
+            // 2. Verify payment with backend (HMAC check + Firestore save)
+            const verifyRes = await fetch('/api/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...response,
+                orderData: orderPayload
+              }),
+            });
+
+            const verification = await verifyRes.json();
+
+            if (verification.success) {
+              // 3. Success path: Fire celebration and show success screen
+              // Note: The order is already saved to Firestore by the backend API
+              triggerCelebration();
+              addToast('Order Placed Successfully 🎉', 'success');
+
+              setSuccessOrderId(verification.orderId);
+              setSuccessOrderTotal(totalPrice());
+              
+              setShowConfirmModal(false);
+              setIsSuccess(true);
+              clearCart();
+            } else {
+              // 4. Verification failed logic
+              addToast(verification.message || 'Payment verification failed', 'warn');
+              setIsProcessing(false);
+            }
+          } catch (error) {
+            addToast('Error verifying payment. Please contact support.', 'warn');
+            setIsProcessing(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setIsProcessing(false);
+            addToast('Payment cancelled.', 'default');
+          },
+        },
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+        },
+        theme: {
+          color: '#FF5A00', // match app's primary orange
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+
+      // Reset processing state after opening — handler callback owns state from here
+      setIsProcessing(false);
+
+    } catch {
+      addToast('Something went wrong. Please try again.', 'warn');
+      setIsProcessing(false);
+    }
+  };
+
   const copyUpiId = () => {
     navigator.clipboard.writeText('paytm.s1sp0hd@pty');
+    addToast('UPI ID copied!', 'success');
   };
 
   if (isSuccess) {
@@ -118,7 +293,7 @@ export default function CheckoutPage() {
         <motion.div 
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
           className="bg-[#15151a]/80 backdrop-blur-xl p-8 sm:p-10 rounded-3xl border border-white/10 text-center shadow-2xl max-w-md w-full relative z-10"
         >
           <motion.div
@@ -228,17 +403,19 @@ export default function CheckoutPage() {
               <Navigation className="w-5 h-5 text-primary" /> Payment Method
             </h3>
             
+            {/* Payment method tabs */}
             <div className="flex bg-black/40 p-1.5 rounded-xl border border-white/10 mb-6 w-full">
               {[
-                { id: 'QR', icon: QrCode, label: 'QR Scan' },
-                { id: 'UPI', icon: Smartphone, label: 'UPI ID' }
+                { id: 'QR',       icon: QrCode,      label: 'QR Scan'    },
+                { id: 'UPI',      icon: Smartphone,  label: 'UPI ID'     },
+                { id: 'RAZORPAY', icon: CreditCard,  label: 'Pay Online' },
               ].map(opt => {
                 const Icon = opt.icon;
                 return (
                   <button
                     key={opt.id}
-                    onClick={() => setPaymentMethod(opt.id as 'QR' | 'UPI')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all ${
+                    onClick={() => setPaymentMethod(opt.id as 'QR' | 'UPI' | 'RAZORPAY')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-lg text-xs sm:text-sm font-bold transition-all ${
                       paymentMethod === opt.id 
                         ? 'bg-primary text-white shadow-[0_0_15px_rgba(255,90,0,0.4)]' 
                         : 'text-muted-foreground hover:bg-white/5 hover:text-white'
@@ -246,21 +423,23 @@ export default function CheckoutPage() {
                   >
                     <Icon className="w-4 h-4" /> <span>{opt.label}</span>
                   </button>
-                )
+                );
               })}
             </div>
 
             <div className="bg-[#0f0f14] border border-white/5 rounded-xl p-6">
+              {/* QR payment */}
               {paymentMethod === 'QR' && (
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
                   className="flex flex-col items-center text-center"
                 >
                   <div className="bg-white p-4 rounded-xl mb-4 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
                     <img src="/qr.png" alt="Scan to pay" className="w-40 h-40 rounded-lg object-contain" />
                   </div>
-                  <h4 className="font-bold text-white text-lg mb-2">Scan & Pay using any UPI app</h4>
+                  <h4 className="font-bold text-white text-lg mb-2">Scan &amp; Pay using any UPI app</h4>
                   <p className="text-sm text-muted-foreground mb-6">GPay, PhonePe, Paytm supported.</p>
                   
                   <Button 
@@ -273,10 +452,12 @@ export default function CheckoutPage() {
                 </motion.div>
               )}
 
+              {/* UPI payment */}
               {paymentMethod === 'UPI' && (
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
                   className="flex flex-col text-center"
                 >
                   <div className="bg-black/60 border border-white/10 p-5 rounded-xl mb-6">
@@ -308,8 +489,47 @@ export default function CheckoutPage() {
                   </Button>
                 </motion.div>
               )}
-            </div>
 
+              {/* Razorpay payment */}
+              {paymentMethod === 'RAZORPAY' && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="flex flex-col items-center text-center"
+                >
+                  {/* Razorpay branding */}
+                  <div className="w-20 h-20 rounded-2xl bg-[#072654] flex items-center justify-center mb-5 shadow-[0_0_25px_rgba(7,38,84,0.5)] border border-white/10">
+                    <svg viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-12 h-12">
+                      <path d="M15 45L27 15H39L27 35H45L21 60L30 38H15V45Z" fill="#3395FF"/>
+                    </svg>
+                  </div>
+                  <h4 className="font-bold text-white text-lg mb-2">Pay Securely with Razorpay</h4>
+                  <p className="text-sm text-muted-foreground mb-2">Cards · UPI · Netbanking · Wallets</p>
+                  <p className="text-xs text-white/30 mb-6">256-bit SSL encrypted · PCI-DSS compliant</p>
+
+                  <div className="w-full bg-black/30 border border-white/5 rounded-xl p-4 mb-6 text-left space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/50">Amount to pay</span>
+                      <span className="text-white font-bold">₹{totalPrice().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/50">Payment gateway</span>
+                      <span className="text-white font-bold">Razorpay</span>
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={handlePayment}
+                    className="w-full h-12 text-md font-bold bg-[#3395FF] hover:bg-[#2280e0] shadow-[0_0_20px_rgba(51,149,255,0.3)]"
+                    isLoading={isProcessing}
+                    disabled={isProcessing}
+                  >
+                    Pay ₹{totalPrice().toFixed(2)} Now
+                  </Button>
+                </motion.div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -341,30 +561,44 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          <Button 
-            className="w-full h-14 text-lg"
-            onClick={() => setShowConfirmModal(true)}
-            disabled={isProcessing}
-            isLoading={isProcessing}
-          >
-            I have completed payment
-          </Button>
+          {/* Summary panel CTA — adapts to selected payment method */}
+          {paymentMethod === 'RAZORPAY' ? (
+            <Button 
+              className="w-full h-14 text-lg bg-[#3395FF] hover:bg-[#2280e0] shadow-[0_0_20px_rgba(51,149,255,0.3)]"
+              onClick={handlePayment}
+              disabled={isProcessing}
+              isLoading={isProcessing}
+            >
+              Pay ₹{totalPrice().toFixed(2)} with Razorpay
+            </Button>
+          ) : (
+            <Button 
+              className="w-full h-14 text-lg"
+              onClick={() => setShowConfirmModal(true)}
+              disabled={isProcessing}
+              isLoading={isProcessing}
+            >
+              I have completed payment
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal (QR / UPI only — Razorpay has its own popup) */}
       <AnimatePresence>
         {showConfirmModal && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
             className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/80 backdrop-blur-sm"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
               className="bg-[#15151a] border border-white/10 rounded-2xl p-8 w-full max-w-md shadow-2xl relative"
             >
               <div className="flex flex-col items-center text-center">
@@ -386,7 +620,7 @@ export default function CheckoutPage() {
                   </Button>
                   <Button 
                     className="flex-1 h-12"
-                    onClick={handlePlaceOrder}
+                    onClick={() => handlePlaceOrder()}
                     isLoading={isProcessing}
                     disabled={isProcessing}
                   >

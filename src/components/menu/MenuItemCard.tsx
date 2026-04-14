@@ -81,7 +81,7 @@ export const MenuItemCard = ({ item, index }: MenuItemCardProps) => {
           onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&q=80&w=600'; }}
           alt={item.name} 
           loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110"
+          className="w-full h-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 image-premium-load"
         />
         
         {/* Veg Badge */}
