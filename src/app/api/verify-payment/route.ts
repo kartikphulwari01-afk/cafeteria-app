@@ -3,8 +3,19 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
+// Force-dynamic ensuring this route is never statically generated at build time
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
+    const key_secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!key_secret) {
+      console.error("Critical Error: RAZORPAY_KEY_SECRET missing in environment variables.");
+      return Response.json(
+        { success: false, message: "Payment verification configuration is missing." },
+        { status: 500 }
+      );
+    }
     const { 
       razorpay_order_id, 
       razorpay_payment_id, 
