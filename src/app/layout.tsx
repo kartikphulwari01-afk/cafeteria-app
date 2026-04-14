@@ -22,6 +22,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
+      </head>
       <body
         className={`${inter.className} min-h-screen bg-background text-foreground antialiased selection:bg-primary selection:text-white pb-20 sm:pb-0 font-sans`}
       >
