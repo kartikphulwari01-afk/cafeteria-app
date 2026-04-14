@@ -170,8 +170,25 @@ export default function LoginPage() {
         router.push(isAdmin ? '/admin' : '/home');
       }, 2000);
 
-    } catch {
-      setErrorMessage('Failed to login with Google. Please try again.');
+    } catch (error: any) {
+      console.error("Firebase Login Error:", {
+        code: error.code,
+        message: error.message,
+        email: email
+      });
+      
+      let msg = 'Failed to login with Google. Please try again.';
+      if (error.code === 'auth/invalid-api-key') {
+        msg = 'Critical Error: Firebase API key is invalid. Please check Vercel environment variables.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        msg = 'Domain not authorized. Please add this domain to Firebase authorized domains.';
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        msg = 'Login popup was closed. Please try again.';
+      } else if (error.code === 'auth/network-request-failed') {
+        msg = 'Network error. Please check your internet connection.';
+      }
+      
+      setErrorMessage(msg);
     } finally {
       setIsLoading(false);
     }
