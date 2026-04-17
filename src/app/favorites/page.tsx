@@ -30,7 +30,7 @@ export default function FavoritesPage() {
   const favoriteItems = mockMenu.filter(item => favoriteIds.includes(item.id));
 
   return (
-    <div className="min-h-screen pt-32 pb-12 px-4 max-w-6xl mx-auto">
+    <div className="min-h-screen pt-32 pb-40 px-4 max-w-6xl mx-auto">
       <div className="flex items-center gap-3 mb-8">
         <div className="w-12 h-12 rounded-2xl bg-red-500/20 flex items-center justify-center">
           <Heart className="w-6 h-6 text-red-500 fill-red-500" />
@@ -51,7 +51,7 @@ export default function FavoritesPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
           {favoriteItems.map((item, idx) => (
             <MenuItemCard key={item.id} item={item} index={idx} />
           ))}

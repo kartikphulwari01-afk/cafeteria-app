@@ -82,7 +82,7 @@ export default function Home() {
       </section>
 
       {/* Popular Items Section */}
-      <section className="py-20 px-4 container mx-auto">
+      <section className="py-20 pb-40 px-4 container mx-auto">
         <div className="flex items-center justify-between mb-12">
           <h2 className="text-3xl font-bold flex items-center gap-3">
              Popular Right Now
@@ -93,13 +93,13 @@ export default function Home() {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-96 rounded-2xl bg-white/5 animate-pulse"></div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-64 rounded-2xl bg-white/5 animate-pulse"></div>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
             {popularItems.map((item, index) => (
               <MenuItemCard key={item.id} item={item} index={index} />
             ))}
