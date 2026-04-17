@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface User {
   uid: string;
@@ -14,9 +15,16 @@ interface UserState {
   isAdmin: () => boolean;
 }
 
-export const useUserStore = create<UserState>((set, get) => ({
-  user: null, // Start unauthenticated
-  login: (user) => set({ user }),
-  logout: () => set({ user: null }),
-  isAdmin: () => get().user?.role === 'admin',
-}));
+export const useUserStore = create<UserState>()(
+  persist(
+    (set, get) => ({
+      user: null, // Start unauthenticated
+      login: (user) => set({ user }),
+      logout: () => set({ user: null }),
+      isAdmin: () => get().user?.role === 'admin',
+    }),
+    {
+      name: 'user-storage', // name of item in localStorage
+    }
+  )
+);

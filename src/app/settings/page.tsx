@@ -23,9 +23,9 @@ export default function SettingsPage() {
   }
 
   const handleLogout = async () => {
-    logout();
-    await nextAuthSignOut({ redirect: false });
-    router.push('/auth/login');
+    logout(); // clear zustand Persistent Store
+    // Provide callbackUrl directly to NextAuth to handle the redirect safely
+    await nextAuthSignOut({ callbackUrl: '/auth/login' });
   };
 
   return (
