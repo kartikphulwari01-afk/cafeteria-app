@@ -7,7 +7,7 @@ import { useUserStore } from '@/store/userStore';
 import { useToastStore } from '@/store/toastStore';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Clock, Navigation, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Clock, Navigation, CheckCircle, ArrowLeft, QrCode, Smartphone, Copy, ExternalLink, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -71,6 +71,9 @@ export default function CheckoutPage() {
   const [successOrderId, setSuccessOrderId] = useState('');
   const [successOrderTotal, setSuccessOrderTotal] = useState(0);
 
+  const [paymentMethod, setPaymentMethod] = useState<'QR' | 'UPI' | 'RAZORPAY'>('QR');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
   useEffect(() => {
     if (!user) {
       router.push('/auth/login');
@@ -107,6 +110,60 @@ export default function CheckoutPage() {
     return true;
   };
 
+  // Core order placement — accepts optional Razorpay payment details
+  const handlePlaceOrder = async (razorpayData?: {
+    paymentId: string;
+    orderId: string;
+  }) => {
+    if (pickupType === 'SCHEDULED' && !validateTime(scheduledTime)) {
+      return;
+    }
+
+    setIsProcessing(true);
+    
+    try {
+      if (!user?.uid) {
+        throw new Error('User not found or not logged in.');
+      }
+
+      const isRazorpayPayment = !!razorpayData;
+
+      const orderData = {
+        userId: user.uid,
+        userName: user.name || user.email,
+        userEmail: user.email,
+        items: items.map(i => ({ menuItemId: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+        totalAmount: totalPrice(),
+        pickupType,
+        scheduledTime: pickupType === 'SCHEDULED' ? scheduledTime : null,
+        pickupTime: pickupType === 'ASAP' ? 'ASAP' : `Scheduled: ${scheduledTime}`,
+        paymentMethod: isRazorpayPayment ? 'RAZORPAY' : paymentMethod,
+        paymentStatus: isRazorpayPayment ? 'Paid' : 'Pending Verification',
+        // Store Razorpay IDs for reconciliation if paid online
+        ...(razorpayData && {
+          razorpayPaymentId: razorpayData.paymentId,
+          razorpayOrderId: razorpayData.orderId,
+        }),
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      };
+
+      const finalTotal = totalPrice();
+      const docRef = await addDoc(collection(db, 'orders'), orderData);
+      
+      setSuccessOrderId(docRef.id);
+      setSuccessOrderTotal(finalTotal);
+      
+      setShowConfirmModal(false);
+      setIsSuccess(true);
+      clearCart();
+      
+    } catch {
+      addToast('Checkout failed. Please try again.', 'warn');
+      setIsProcessing(false);
+      setShowConfirmModal(false);
+    }
+  };
 
   // Razorpay payment flow — calls backend to create order, then opens popup
   const handlePayment = async () => {
@@ -183,6 +240,7 @@ export default function CheckoutPage() {
               setSuccessOrderId(verification.orderId);
               setSuccessOrderTotal(totalPrice());
               
+              setShowConfirmModal(false);
               setIsSuccess(true);
               clearCart();
             } else {
@@ -220,6 +278,11 @@ export default function CheckoutPage() {
       addToast('Something went wrong. Please try again.', 'warn');
       setIsProcessing(false);
     }
+  };
+
+  const copyUpiId = () => {
+    navigator.clipboard.writeText('paytm.s1sp0hd@pty');
+    addToast('UPI ID copied!', 'success');
   };
 
   if (isSuccess) {
@@ -340,9 +403,96 @@ export default function CheckoutPage() {
               <Navigation className="w-5 h-5 text-primary" /> Payment Method
             </h3>
             
+            {/* Payment method tabs */}
+            <div className="flex bg-black/40 p-1.5 rounded-xl border border-white/10 mb-6 w-full">
+              {[
+                { id: 'QR',       icon: QrCode,      label: 'QR Scan'    },
+                { id: 'UPI',      icon: Smartphone,  label: 'UPI ID'     },
+                { id: 'RAZORPAY', icon: CreditCard,  label: 'Pay Online' },
+              ].map(opt => {
+                const Icon = opt.icon;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => setPaymentMethod(opt.id as 'QR' | 'UPI' | 'RAZORPAY')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+                      paymentMethod === opt.id 
+                        ? 'bg-primary text-white shadow-[0_0_15px_rgba(255,90,0,0.4)]' 
+                        : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" /> <span>{opt.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="bg-[#0f0f14] border border-white/5 rounded-xl p-6">
-              {/* Razorpay payment only */}
-              <motion.div 
+              {/* QR payment */}
+              {paymentMethod === 'QR' && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="flex flex-col items-center text-center"
+                >
+                  <div className="bg-white p-4 rounded-xl mb-4 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+                    <img src="/qr.png" alt="Scan to pay" className="w-40 h-40 rounded-lg object-contain" />
+                  </div>
+                  <h4 className="font-bold text-white text-lg mb-2">Scan &amp; Pay using any UPI app</h4>
+                  <p className="text-sm text-muted-foreground mb-6">GPay, PhonePe, Paytm supported.</p>
+                  
+                  <Button 
+                    onClick={() => setShowConfirmModal(true)} 
+                    className="w-full h-12 text-md font-bold"
+                    disabled={isProcessing}
+                  >
+                    I have completed payment
+                  </Button>
+                </motion.div>
+              )}
+
+              {/* UPI payment */}
+              {paymentMethod === 'UPI' && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="flex flex-col text-center"
+                >
+                  <div className="bg-black/60 border border-white/10 p-5 rounded-xl mb-6">
+                    <p className="text-xs text-muted-foreground font-bold mb-2 uppercase tracking-wider">Business UPI ID</p>
+                    <div className="flex items-center justify-between bg-[#15151a] p-4 rounded-lg border border-white/5">
+                      <span className="text-lg text-primary font-black tracking-wide">paytm.s1sp0hd@pty</span>
+                      <button 
+                        onClick={copyUpiId}
+                        className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/80 hover:text-white transition-colors" 
+                        title="Copy UPI ID"
+                      >
+                        <Copy className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <a 
+                      href="upi://pay?pa=paytm.s1sp0hd@pty&pn=Cafeteria"
+                      className="mt-4 flex items-center justify-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors font-semibold"
+                    >
+                      <ExternalLink className="w-4 h-4" /> Open in UPI App
+                    </a>
+                  </div>
+                  
+                  <Button 
+                    onClick={() => setShowConfirmModal(true)} 
+                    className="w-full h-12 text-md font-bold"
+                    disabled={isProcessing}
+                  >
+                    I have completed payment
+                  </Button>
+                </motion.div>
+              )}
+
+              {/* Razorpay payment */}
+              {paymentMethod === 'RAZORPAY' && (
+                <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2, ease: 'easeOut' }}
@@ -378,6 +528,7 @@ export default function CheckoutPage() {
                     Pay ₹{totalPrice().toFixed(2)} Now
                   </Button>
                 </motion.div>
+              )}
             </div>
           </div>
         </div>
@@ -410,18 +561,77 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* Summary panel CTA */}
-          <Button 
-            className="w-full h-14 text-lg bg-[#3395FF] hover:bg-[#2280e0] shadow-[0_0_20px_rgba(51,149,255,0.3)]"
-            onClick={handlePayment}
-            disabled={isProcessing}
-            isLoading={isProcessing}
-          >
-            Pay ₹{totalPrice().toFixed(2)} with Razorpay
-          </Button>
+          {/* Summary panel CTA — adapts to selected payment method */}
+          {paymentMethod === 'RAZORPAY' ? (
+            <Button 
+              className="w-full h-14 text-lg bg-[#3395FF] hover:bg-[#2280e0] shadow-[0_0_20px_rgba(51,149,255,0.3)]"
+              onClick={handlePayment}
+              disabled={isProcessing}
+              isLoading={isProcessing}
+            >
+              Pay ₹{totalPrice().toFixed(2)} with Razorpay
+            </Button>
+          ) : (
+            <Button 
+              className="w-full h-14 text-lg"
+              onClick={() => setShowConfirmModal(true)}
+              disabled={isProcessing}
+              isLoading={isProcessing}
+            >
+              I have completed payment
+            </Button>
+          )}
         </div>
       </div>
 
+      {/* Confirmation Modal (QR / UPI only — Razorpay has its own popup) */}
+      <AnimatePresence>
+        {showConfirmModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="bg-[#15151a] border border-white/10 rounded-2xl p-8 w-full max-w-md shadow-2xl relative"
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-6">
+                  <CheckCircle className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">Confirm Payment</h3>
+                <p className="text-muted-foreground mb-8 text-md px-2">
+                  Have you successfully completed the payment of <span className="text-white font-bold">₹{totalPrice().toFixed(2)}</span> on your UPI app?
+                </p>
+                <div className="flex flex-col sm:flex-row w-full gap-3">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 bg-transparent border-white/20 text-white hover:bg-white/5 h-12"
+                    onClick={() => setShowConfirmModal(false)}
+                    disabled={isProcessing}
+                  >
+                    No, Cancel
+                  </Button>
+                  <Button 
+                    className="flex-1 h-12"
+                    onClick={() => handlePlaceOrder()}
+                    isLoading={isProcessing}
+                    disabled={isProcessing}
+                  >
+                    Yes, place order
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
