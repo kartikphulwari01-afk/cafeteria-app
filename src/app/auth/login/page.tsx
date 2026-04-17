@@ -7,6 +7,10 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Mail, Lock, User as UserIcon, Shield } from 'lucide-react';
 
+import { auth } from '@/lib/firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signIn, signOut as nextAuthSignOut, useSession } from 'next-auth/react';
+
 const ALLOWED_ADMIN_EMAILS = [
   'kartikphulwari01@gmail.com',
   'aryanchaturvedi2006@gmail.com'
@@ -26,6 +30,35 @@ export default function LoginPage() {
 
   const { login } = useUserStore();
   const router = useRouter();
+  const { data: session, status } = useSession();
+
+  // NextAuth Session Sync
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      const storedRole = localStorage.getItem('loginRole') || 'student';
+      const isAdmin = storedRole === 'admin';
+
+      if (isAdmin && session.user.email && !ALLOWED_ADMIN_EMAILS.includes(session.user.email)) {
+        nextAuthSignOut({ redirect: false });
+        setErrorMessage('Access Denied: Not an Admin');
+        return;
+      }
+
+      login({
+        uid: (session.user as any).uid || session.user.email || 'google-user',
+        name: session.user.name || (isAdmin ? 'Admin User' : 'Student Buddy'),
+        email: session.user.email || '',
+        role: isAdmin ? 'admin' : 'user'
+      });
+
+      const uName = session.user.name || (isAdmin ? 'Admin User' : 'Student Buddy');
+      setWelcomeName(uName);
+      setShowWelcome(true);
+      setTimeout(() => {
+        router.push(isAdmin ? '/admin' : '/home');
+      }, 2000);
+    }
+  }, [status, session, login, router]);
 
   useEffect(() => {
     setMounted(true);
@@ -51,9 +84,6 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
-      const { auth } = await import('@/lib/firebase');
-      const { signInWithEmailAndPassword } = await import('firebase/auth');
-      
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
@@ -97,9 +127,6 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const { auth } = await import('@/lib/firebase');
-      const { createUserWithEmailAndPassword } = await import('firebase/auth');
-
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
@@ -133,65 +160,16 @@ export default function LoginPage() {
   const handleSocialLogin = async (provider: string) => {
     if (provider !== 'google') return;
     setErrorMessage('');
-
+    setIsLoading(true);
+    
+    // Store selected role for when NextAuth redirects back
+    localStorage.setItem('loginRole', loginRole);
+    
     try {
-      setIsLoading(true);
-
-      const { auth } = await import('@/lib/firebase');
-      const { GoogleAuthProvider, signInWithPopup, signOut } = await import('firebase/auth');
-
-      const googleProvider = new GoogleAuthProvider();
-      // Force account selection to prevent silent failures with stale sessions
-      googleProvider.setCustomParameters({ prompt: 'select_account' });
-
-      const result = await signInWithPopup(auth, googleProvider);
-
-      const user = result.user;
-
-      const isAdmin = loginRole === 'admin';
-
-      // Admin verification check
-      if (isAdmin && user.email && !ALLOWED_ADMIN_EMAILS.includes(user.email)) {
-        await signOut(auth);
-        setErrorMessage('Access Denied: Not an Admin');
-        setIsLoading(false);
-        return;
-      }
-
-      login({
-        uid: user.uid,
-        name: user.displayName || (isAdmin ? 'Admin User' : 'Student Buddy'),
-        email: user.email || '',
-        role: isAdmin ? 'admin' : 'user'
-      });
-
-      const uName = user.displayName || (isAdmin ? 'Admin User' : 'Student Buddy');
-      setWelcomeName(uName);
-      setShowWelcome(true);
-      setTimeout(() => {
-        router.push(isAdmin ? '/admin' : '/home');
-      }, 2000);
-
-    } catch (error: any) {
-      console.error("Firebase Login Error:", {
-        code: error.code,
-        message: error.message,
-        email: email
-      });
-      
-      let msg = 'Failed to login with Google. Please try again.';
-      if (error.code === 'auth/invalid-api-key') {
-        msg = 'Critical Error: Firebase API key is invalid. Please check Vercel environment variables.';
-      } else if (error.code === 'auth/unauthorized-domain') {
-        msg = 'Domain not authorized. Please add this domain to Firebase authorized domains.';
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        msg = 'Login popup was closed. Please try again.';
-      } else if (error.code === 'auth/network-request-failed') {
-        msg = 'Network error. Please check your internet connection.';
-      }
-      
-      setErrorMessage(msg);
-    } finally {
+      await signIn('google'); // window.location.href not available statically, so we rely on default callback
+    } catch (error) {
+      console.error("NextAuth Login Error:", error);
+      setErrorMessage('Failed to login with Google. Please try again.');
       setIsLoading(false);
     }
   };

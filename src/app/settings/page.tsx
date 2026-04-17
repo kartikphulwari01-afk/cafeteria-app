@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/store/userStore';
 import { LifeBuoy, LogOut, Settings as SettingsIcon, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { signOut as nextAuthSignOut } from 'next-auth/react';
 
 export default function SettingsPage() {
   const { user, logout } = useUserStore();
@@ -22,8 +23,8 @@ export default function SettingsPage() {
   }
 
   const handleLogout = async () => {
-    // In full Firebase implementation this would await signOut(auth)
     logout();
+    await nextAuthSignOut({ redirect: false });
     router.push('/auth/login');
   };
 

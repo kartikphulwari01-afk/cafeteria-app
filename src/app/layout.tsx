@@ -6,6 +6,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { CartBar } from "@/components/ui/CartBar";
 import { ToastContainer } from "@/components/ui/ToastContainer";
 import { OrderNotifier } from "@/components/ui/OrderNotifier";
+import { Providers } from "@/components/Providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
       </head>
@@ -33,7 +34,9 @@ export default function RootLayout({
         <OrderNotifier />
         <Navbar />
         <main className="pt-16 min-h-[calc(100vh-64px)]">
-          {children}
+          <Providers>
+            {children}
+          </Providers>
         </main>
         <CartBar />
         <Script
